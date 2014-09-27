@@ -1,10 +1,12 @@
-from setuptools import setup, find_packages
-import sys, os
+from setuptools import setup
+import sys
 
-version = "1.0"
+extra = {}
+if sys.version_info < (3,):
+        extra['use_3to2'] = True
 
 setup(name="zdgrab",
-      version=version,
+      version="2.0",
       scripts=["bin/zdgrab", "bin/zdsplode"],
       description="Get attachments from Zendesk tickets.",
       long_description="Get attachments from Zendesk tickets.",
@@ -16,13 +18,12 @@ setup(name="zdgrab",
       keywords="zendesk attachment",
       author="Brent Woodruff",
       author_email="brent@fprimex.com",
-      url="http://github.com/basho/zdgrab",
+      url="http://github.com/fprimex/zdgrab",
       license="Apache",
-      packages=find_packages(exclude=["ez_setup", "examples", "tests"]),
       include_package_data=True,
       zip_safe=False,
       install_requires=[
-        "configparser",
-        "zendesk",
-      ]
+        "zdesk",
+      ],
+      **extra
 )
