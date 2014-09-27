@@ -2,16 +2,20 @@
 zdgrab: Download attachments from Zendesk tickets
 """
 
-import os, textwrap
+import os
+import sys
+import textwrap
+import argparse
 import configparser
+import urllib.request, urllib.parse, urllib.error, base64
+
+from zdesk import Zendesk
 
 from .zdsplode import zdsplode
 
 def zdgrab(zd, agent='me', ticket_ids=None,
            work_dir=os.path.join(os.path.expanduser('~'), 'zdgrab'),
            verbose=False):
-
-    import urllib.request, urllib.parse, urllib.error, base64
 
     # dict of paths to attachments retrieved to return. format is:
     # { 'path/to/ticket/1': [ 'path/to/attachment1', 'path/to/attachment2' ],
@@ -150,8 +154,6 @@ def config_state(config_file, section, state):
     state.update(config_dict)
 
 def config(argv=None):
-    import os, sys, argparse
-
     # Options precedence:
     # program state defaults, which are overridden by
     # ~/.zd.cfg [zdgrab] section options, which are overridden by
@@ -233,7 +235,6 @@ def config(argv=None):
             # -c CONFIG_FILE did not have a [zdgrab] section. Skip it.
             pass
 
-    from zendesk import Zendesk
     if state['url'] and state['mail'] and state['password']:
         if state['verbose']:
             print('Configuring Zendesk with:\n'
