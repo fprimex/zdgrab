@@ -52,9 +52,9 @@ def zdgrab(zd, agent='me', ticket_ids=None,
     # We're going to borrow the zendesk object's httplib client.
     headers = {}
     if zd.zendesk_username is not None and zd.zendesk_password is not None:
-        headers["Authorization"] = "Basic %s" % (
-            base64.b64encode(zd.zendesk_username + ':' +
-                             zd.zendesk_password))
+        headers["Authorization"] = "Basic {}".format(
+            base64.b64encode(zd.zendesk_username.encode('ascii') + b':' +
+                             zd.zendesk_password.encode('ascii')))
 
     # Get the attachments from the given zendesk tickets
     for ticket in response['results']:
