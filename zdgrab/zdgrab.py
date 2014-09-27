@@ -64,7 +64,7 @@ def zdgrab(zd, agent='me', ticket_ids=None,
         ticket_dir = os.path.join(work_dir, str(ticket['id']))
         ticket_com_dir = os.path.join(ticket_dir, 'comments')
         comment_num = 0
-        audits = zd.list_audits(ticket_id=ticket['id'])['audits']
+        audits = zd.ticket_audits(ticket_id=ticket['id'])['audits']
         for audit in audits:
             for event in audit['events']:
                 if event['type'] != 'Comment':
