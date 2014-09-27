@@ -144,20 +144,13 @@ def config_state(config_file, section, state):
 
     # Convert any new strings to full unicode
     for k in [k for k, v in config_dict.items() if isinstance(v, str)]:
-        config_dict[k] = config_dict[k].decode('utf-8')
+        config_dict[k] = config_dict[k]
 
     # update the state with the section dict
     state.update(config_dict)
 
 def config(argv=None):
     import os, sys, argparse
-
-    # Declare a class for an argparse custom action.
-    # Handles converting ascii input from argparse that may contain unicode
-    # to a real unicode string.
-    class UnicodeStore(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):
-            setattr(namespace, self.dest, values.decode('utf-8'))
 
     # Options precedence:
     # program state defaults, which are overridden by
@@ -185,24 +178,24 @@ def config(argv=None):
     argp.add_argument('-v', '--verbose', action='store_true',
         help='Verbose output')
 
-    argp.add_argument('-t', action=UnicodeStore, dest='tickets',
+    argp.add_argument('-t', dest='tickets',
         help='Ticket(s) to grab attachments (default: all of your open tickets)')
 
-    argp.add_argument('-c', action=UnicodeStore, dest='config_file',
+    argp.add_argument('-c', dest='config_file',
         help='Configuration file (overrides ~/.zd.cfg)')
 
-    argp.add_argument('-w', action=UnicodeStore, dest='work_dir',
+    argp.add_argument('-w', dest='work_dir',
         help="""Working directory in which to store attachments.
         (default: ~/zdgrab/)""")
 
-    argp.add_argument('-a', action=UnicodeStore, dest='agent',
+    argp.add_argument('-a', dest='agent',
         help='Agent whose open tickets to search (default: me)')
 
-    argp.add_argument('-u', action=UnicodeStore, dest='url',
+    argp.add_argument('-u', dest='url',
         help='URL of Zendesk (e.g. https://example.zendesk.com)')
-    argp.add_argument('-m', action=UnicodeStore, dest='mail',
+    argp.add_argument('-m', dest='mail',
         help='E-Mail address for Zendesk login')
-    argp.add_argument('-p', action=UnicodeStore, dest='password',
+    argp.add_argument('-p', dest='password',
         help='Password for Zendesk login',
         nargs='?', const=state['password'])
     argp.add_argument('-i', '--is-token', action='store_true', dest='is_token',
