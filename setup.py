@@ -8,6 +8,7 @@ if sys.version_info < (3,):
 setup(name="zdgrab",
       version="2.0",
       scripts=["bin/zdgrab", "bin/zdsplode"],
+      packages=["zdgrab"],
       description="Get attachments from Zendesk tickets.",
       long_description="Get attachments from Zendesk tickets.",
       classifiers=["Development Status :: 4 - Beta",
