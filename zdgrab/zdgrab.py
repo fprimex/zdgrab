@@ -2,20 +2,79 @@
 zdgrab: Download attachments from Zendesk tickets
 """
 
+from __future__ import print_function
+
 import os
 import sys
 import textwrap
-import argparse
-import configparser
-import urllib.request, urllib.parse, urllib.error, base64
+import base64
 
+import zdeskcfg
 from zdesk import Zendesk
 
 from .zdsplode import zdsplode
 
-def zdgrab(zd, agent='me', ticket_ids=None,
+@zdeskcfg.configure(
+    verbose=('verbose output', 'flag', 'v'),
+    tickets=('Ticket(s) to grab attachments (default: all of your open tickets)',
+                      'option', 't', None, None, 'TICKETS'),
+    work_dir=('Working directory in which to store attachments. (default: ~/zdgrab/)',
+                      'option', 'w', None, None, 'WORK_DIR'),
+    agent=('Agent whose open tickets to search (default: me)',
+                      'option', 'a', None, None, 'AGENT'),
+    )
+def zdgrab(verbose=False,
+           tickets=None,
            work_dir=os.path.join(os.path.expanduser('~'), 'zdgrab'),
-           verbose=False):
+           agent='me'):
+    "Download attachments from Zendesk tickets."
+
+    cfg = zdgrab.getconfig()
+
+    if cfg['zdesk_url'] and cfg['zdesk_email'] and cfg['zdesk_password']:
+        if verbose:
+            print('Configuring Zendesk with:\n'
+                  '  url: {}\n'
+                  '  mail: {}\n'
+                  '  is_token: {}\n'
+                  '  password: (hidden)\n'.format( cfg['zdesk_url'],
+                                                   cfg['zdesk_email'],
+                                                   repr(cfg['zdesk_token']) ))
+        zd = Zendesk(**cfg)
+    else:
+        msg = textwrap.dedent("""\
+            Error: Need Zendesk config to continue.
+
+            Config file (~/.zdeskcfg) should be something like:
+            [zdesk]
+            url = https://example.zendesk.com
+            email = you@example.com
+            password = dneib393fwEF3ifbsEXAMPLEdhb93dw343
+            token = 1
+
+            [zdgrab]
+            agent = agent@example.com
+            """)
+        print(msg)
+        return 1
+
+    # Log the cfg
+    #if verbose:
+    #    print('Running with program cfg:')
+    #    # Let's go around our ass to get to our elbow to hide the password here.
+    #    for (k, v) in [(k, v) for k, v in cfg.items() if k != 'password']:
+    #        print(('  {}: {}'.format(k, repr(v))))
+    #    print('  password: (hidden)\n')
+
+    # tickets=None means default to getting all of the attachments for this
+    # user's open tickets. If tickets is given, try to split it into ints
+    if tickets:
+        # User gave a list of tickets
+        try:
+            tickets = [int(i) for i in tickets.split(',')]
+        except ValueError:
+            print('Error: Could not convert to integers: {}'.format(tickets))
+            return 1
 
     # dict of paths to attachments retrieved to return. format is:
     # { 'path/to/ticket/1': [ 'path/to/attachment1', 'path/to/attachment2' ],
@@ -35,9 +94,9 @@ def zdgrab(zd, agent='me', ticket_ids=None,
     # Change to working directory to begin file output
     os.chdir(work_dir)
 
-    if ticket_ids:
-        # ticket_ids given, query for those
-        response = zd.search(query=' '.join(['ticket_id:' + s for s in map(str,ticket_ids)]))
+    if tickets:
+        # tickets given, query for those
+        response = zd.search(query=' '.join(['ticket_id:' + s for s in map(str,tickets)]))
     else:
         # List of tickets not given. Get all of the attachments for all of this
         # user's open tickets.
@@ -51,10 +110,10 @@ def zdgrab(zd, agent='me', ticket_ids=None,
     # Fix up some headers to use for downloading the attachments.
     # We're going to borrow the zendesk object's httplib client.
     headers = {}
-    if zd.zendesk_username is not None and zd.zendesk_password is not None:
+    if zd.zdesk_email is not None and zd.zdesk_password is not None:
         headers["Authorization"] = "Basic {}".format(
-            base64.b64encode(zd.zendesk_username.encode('ascii') + b':' +
-                             zd.zendesk_password.encode('ascii')))
+            base64.b64encode(zd.zdesk_email.encode('ascii') + b':' +
+                             zd.zdesk_password.encode('ascii')))
 
     # Get the attachments from the given zendesk tickets
     for ticket in response['results']:
@@ -62,7 +121,7 @@ def zdgrab(zd, agent='me', ticket_ids=None,
             # This is not actually a ticket. Weird. Skip it.
             continue
 
-        if verbose: 
+        if verbose:
             print('Ticket {}'.format(ticket['id']))
 
         ticket_dir = os.path.join(work_dir, str(ticket['id']))
@@ -89,7 +148,7 @@ def zdgrab(zd, agent='me', ticket_ids=None,
                         continue
 
                     # Get this attachment
-                    if verbose: 
+                    if verbose:
                         print('Attachment {}'.format(name))
 
                     # Check for and create the download directory
@@ -118,174 +177,8 @@ def zdgrab(zd, agent='me', ticket_ids=None,
     os.chdir(start_dir)
     return grabs
 
-def config_state(config_file, section, state):
-    """
-    Update a state (a dictionary) with options from a file parsed by
-    configparser for a config [section]. May throw configparser.NoSectionError.
-
-    Handles Boolean values specially by looking at the current state for
-    booleans and updating those values specially with configparser.getboolean
-    """
-
-    # A list of program state items which are booleans.
-    # Kept for convience as they are treated specially when parsing configs.
-    state_bools = [k for k, v in state.items() if isinstance(v, bool)]
-
-    # read the config file
-    config = configparser.SafeConfigParser()
-    config.read(config_file)
-
-    # look for the section, make it a dictionary
-    config_dict = dict(config.items(section))
-
-    # Treat bool values specially using getboolean (allows for 1, yes, true)
-    for k in state_bools:
-        try:
-            config_dict[k] = config.getboolean(section, k)
-        except configparser.NoOptionError:
-            # This config file did not contain this option. Skip it.
-            pass
-
-    # Convert any new strings to full unicode
-    for k in [k for k, v in config_dict.items() if isinstance(v, str)]:
-        config_dict[k] = config_dict[k]
-
-    # update the state with the section dict
-    state.update(config_dict)
-
-def config(argv=None):
-    # Options precedence:
-    # program state defaults, which are overridden by
-    # ~/.zd.cfg [zdgrab] section options, which are overridden by
-    # command line options, which are overridden by
-    # -c CONFIG_FILE [zdgrab] section options, which are overridden by
-    # ~/.zd.cfg [RUN_SECTION] section options, which are overridden by
-    # -c CONFIG_FILE [RUN_SECTION] section options
-    #
-    # Program state, with defaults
-    #
-    state = {
-        'verbose': False,
-        'tickets': None,
-        'work_dir': os.path.join(os.path.expanduser('~'), 'zdgrab'),
-        'agent': 'me',
-        'url': None,
-        'mail': None,
-        'password': 'prompt',
-        'is_token': False,
-    }
-
-    argp = argparse.ArgumentParser(
-        description='Download attachments from Zendesk tickets.')
-    argp.add_argument('-v', '--verbose', action='store_true',
-        help='Verbose output')
-
-    argp.add_argument('-t', dest='tickets',
-        help='Ticket(s) to grab attachments (default: all of your open tickets)')
-
-    argp.add_argument('-c', dest='config_file',
-        help='Configuration file (overrides ~/.zd.cfg)')
-
-    argp.add_argument('-w', dest='work_dir',
-        help="""Working directory in which to store attachments.
-        (default: ~/zdgrab/)""")
-
-    argp.add_argument('-a', dest='agent',
-        help='Agent whose open tickets to search (default: me)')
-
-    argp.add_argument('-u', dest='url',
-        help='URL of Zendesk (e.g. https://example.zendesk.com)')
-    argp.add_argument('-m', dest='mail',
-        help='E-Mail address for Zendesk login')
-    argp.add_argument('-p', dest='password',
-        help='Password for Zendesk login',
-        nargs='?', const=state['password'])
-    argp.add_argument('-i', '--is-token', action='store_true', dest='is_token',
-        help='Is token? Specify if password supplied a Zendesk token')
-
-    # Set argparse defaults with program defaults.
-    # Skip password as it is argparse const, not argparse default
-    argp.set_defaults(**dict((k, v) for k, v in state.items() if k != 'password'))
-
-    # Read ~/.zd.cfg [zdgrab] section and update argparse defaults
-    try:
-        config_state(os.path.join(os.path.expanduser('~'), '.zd.cfg'), 'zd', state)
-        # Password is OK now, because we either have one from the config file or
-        # it is still None.
-        argp.set_defaults(**dict((k, v) for k, v in state.items()))
-    except configparser.NoSectionError:
-        # -c CONFIG_FILE did not have a [zdgrab] section. Skip it.
-        pass
-
-    # Parse the command line options
-    if argv is None:
-        argv = sys.argv
-    args = argp.parse_args()
-
-    # Update the program state with command line options
-    for k in list(state.keys()):
-        state[k] = getattr(args, k)
-
-    # -c CONFIG_FILE given on command line read args.config_file [zdgrab], update state
-    if args.config_file:
-        if state['verbose']: print('Reading config file {}'.format(args.config_file))
-        try:
-            config_state(args.config_file, 'zd', state)
-        except configparser.NoSectionError:
-            # -c CONFIG_FILE did not have a [zdgrab] section. Skip it.
-            pass
-
-    if state['url'] and state['mail'] and state['password']:
-        if state['verbose']:
-            print('Configuring Zendesk with:\n'
-                  '  url: {}\n'
-                  '  mail: {}\n'
-                  '  is_token: {}\n'
-                  '  password: (hidden)\n'.format( state['url'], state['mail'],
-                                         repr(state['is_token']) ))
-        zd = Zendesk(state['url'],
-                    zendesk_username = state['mail'],
-                    zendesk_password = state['password'],
-                    use_api_token = state['is_token'],
-                    api_version=2)
-    else:
-        msg = textwrap.dedent("""\
-            Error: Need Zendesk config to continue. Use -u, -m, -p options
-            or a config file to provide the information.
-
-            Config file (e.g. ~/.zd.cfg) should be something like:
-            [zd]
-            url = https://example.zendesk.com
-            mail = you@example.com
-            password = dneib393fwEF3ifbsEXAMPLEdhb93dw343
-            is_token = 1
-            agent = agent@example.com
-            """)
-        print(msg)
-        return 1
-
-    # Log the state
-    if state['verbose']:
-        print('Running with program state:')
-        # Let's go around our ass to get to our elbow to hide the password here.
-        for (k, v) in [(k, v) for k, v in state.items() if k != 'password']:
-            print(('  {}: {}'.format(k, repr(v))))
-        print('  password: (hidden)\n')
-
-    # tickets=None means default to getting all of the attachments for this
-    # user's open tickets. If tickets is given, try to split it into ints
-    if state['tickets']:
-        # User gave a list of tickets
-        try:
-            state['tickets'] = [int(i) for i in state['tickets'].split(',')]
-        except ValueError:
-            print('Error: Could not convert to integers: {}'.format(state['tickets']))
-            return 1
-
-    return zd, state
 
 def main(argv=None):
-    zd, state = config(argv)
-    zdgrab(zd, state['agent'], state['tickets'], state['work_dir'], state['verbose'])
+    zdeskcfg.call(zdgrab, section='zdgrab')
     return 0
 

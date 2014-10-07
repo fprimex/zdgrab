@@ -1,9 +1,4 @@
 from setuptools import setup
-import sys
-
-extra = {}
-if sys.version_info < (3,):
-        extra['use_3to2'] = True
 
 setup(name="zdgrab",
       version="2.0",
@@ -25,6 +20,6 @@ setup(name="zdgrab",
       zip_safe=False,
       install_requires=[
         "zdesk",
+        "zdeskcfg",
       ],
-      **extra
 )
