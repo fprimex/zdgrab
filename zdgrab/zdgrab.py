@@ -35,8 +35,8 @@ def zdgrab(verbose=False,
         if verbose:
             print('Configuring Zendesk with:\n'
                   '  url: {}\n'
-                  '  mail: {}\n'
-                  '  is_token: {}\n'
+                  '  email: {}\n'
+                  '  token: {}\n'
                   '  password: (hidden)\n'.format( cfg['zdesk_url'],
                                                    cfg['zdesk_email'],
                                                    repr(cfg['zdesk_token']) ))
@@ -59,12 +59,12 @@ def zdgrab(verbose=False,
         return 1
 
     # Log the cfg
-    #if verbose:
-    #    print('Running with program cfg:')
-    #    # Let's go around our ass to get to our elbow to hide the password here.
-    #    for (k, v) in [(k, v) for k, v in cfg.items() if k != 'password']:
-    #        print(('  {}: {}'.format(k, repr(v))))
-    #    print('  password: (hidden)\n')
+    if verbose:
+        print('Running with zdesk config:\n'
+              ' verbose: {}\n'
+              ' tickets: {}\n'
+              ' work_dir: {}\n'
+              ' agent: {}\n'.format(verbose, tickets, work_dir, agent))
 
     # tickets=None means default to getting all of the attachments for this
     # user's open tickets. If tickets is given, try to split it into ints
@@ -96,16 +96,25 @@ def zdgrab(verbose=False,
 
     if tickets:
         # tickets given, query for those
-        response = zd.search(query=' '.join(['ticket_id:' + s for s in map(str,tickets)]))
+        q = ' '.join(['ticket_id:' + s for s in map(str,tickets)])
     else:
         # List of tickets not given. Get all of the attachments for all of this
         # user's open tickets.
-        response = zd.search(query='status<solved assignee:{}'.format(agent))
+        q = 'status<solved assignee:{}'.format(agent)
+
+    response = zd.search(query=q)
 
     if response['count'] == 0:
         # No tickets from which to get attachments
         print("No tickets provided for attachment retrieval.")
         return {}
+
+    results = response['results']
+    page = 1
+    while response['next_page'] != None:
+        page += 1
+        response = zd.search(query=q, page=page)
+        results.extend(response['results'])
 
     # Fix up some headers to use for downloading the attachments.
     # We're going to borrow the zendesk object's httplib client.
@@ -116,7 +125,7 @@ def zdgrab(verbose=False,
                              zd.zdesk_password.encode('ascii')))
 
     # Get the attachments from the given zendesk tickets
-    for ticket in response['results']:
+    for ticket in results:
         if ticket['result_type'] != 'ticket':
             # This is not actually a ticket. Weird. Skip it.
             continue
