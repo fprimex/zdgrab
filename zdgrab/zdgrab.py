@@ -103,7 +103,7 @@ def zdgrab(verbose=False,
         q = 'status<solved assignee:{}'.format(agent)
 
     if verbose:
-        print('Retrieving page 1')
+        print('Retrieving tickets page 1')
 
     response = zd.search(query=q)
 
@@ -118,7 +118,7 @@ def zdgrab(verbose=False,
         page += 1
 
         if verbose:
-            print('Retrieving page {}'.format(page))
+            print('Retrieving tickets page {}'.format(page))
 
         response = zd.search(query=q, page=page)
         results.extend(response['results'])
@@ -143,7 +143,22 @@ def zdgrab(verbose=False,
         ticket_dir = os.path.join(work_dir, str(ticket['id']))
         ticket_com_dir = os.path.join(ticket_dir, 'comments')
         comment_num = 0
-        audits = zd.ticket_audits(ticket_id=ticket['id'])['audits']
+
+        if verbose:
+            print('Retrieving audits page {}'.format(page))
+
+        response = zd.ticket_audits(ticket_id=ticket['id'])
+        audits = response['audits']
+        page = 1
+        while response['next_page'] != None:
+            page += 1
+
+            if verbose:
+                print('Retrieving audits page {}'.format(page))
+
+            response = zd.ticket_audits(ticket_id=ticket['id'], page=page)
+            audits.extend(response['audits'])
+
         for audit in audits:
             for event in audit['events']:
                 if event['type'] != 'Comment':
