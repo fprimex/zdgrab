@@ -60,7 +60,7 @@ def zdgrab(verbose=False,
 
     # Log the cfg
     if verbose:
-        print('Running with zdesk config:\n'
+        print('Running with zdgrab config:\n'
               ' verbose: {}\n'
               ' tickets: {}\n'
               ' work_dir: {}\n'
@@ -102,6 +102,9 @@ def zdgrab(verbose=False,
         # user's open tickets.
         q = 'status<solved assignee:{}'.format(agent)
 
+    if verbose:
+        print('Retrieving page 1')
+
     response = zd.search(query=q)
 
     if response['count'] == 0:
@@ -113,11 +116,15 @@ def zdgrab(verbose=False,
     page = 1
     while response['next_page'] != None:
         page += 1
+
+        if verbose:
+            print('Retrieving page {}'.format(page))
+
         response = zd.search(query=q, page=page)
         results.extend(response['results'])
 
     # Fix up some headers to use for downloading the attachments.
-    # We're going to borrow the zendesk object's httplib client.
+    # We're going to borrow the zdesk object's httplib client.
     headers = {}
     if zd.zdesk_email is not None and zd.zdesk_password is not None:
         headers["Authorization"] = "Basic {}".format(
