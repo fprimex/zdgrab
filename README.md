@@ -5,23 +5,22 @@ Zdgrab is a utility for downloading attachments to tickets from
 
 ## Installing
 
-Tested with Python 2.7. Zdgrab requires configparser and the [patched
-zendesk](http://github.com/eventbrite/zendesk) Python module, which has its own
-requirements. Simplejson may not be strictly required by zendesk, but is
-suggested.
+Tested with Python 2.7 and 3.4. Zdgrab requires
+[zdeskcfg](http://github.com/fprimex/zdeskcfg) and
+[zdesk](http://github.com/fprimex/zdesk) Python modules, which have their own
+requirements.
 
 ```
-pip install https://github.com/eventbrite/zendesk/archive/master.zip
-pip install https://github.com/basho/zdgrab/archive/master.zip
+pip install zdgrab
 ```
 
-You may wish to use easy_install instead of pip, and use a virtualenv.
+You may wish to use easy\_install instead of pip, and use a virtualenv.
 
 ## Zendesk API Token Setup
 
 Note: Users can use a Zendesk shared account and its access token. In this
-shared account setup, set 'mail' to the shared account, and set 'agent' to your
-email address in the configuration file.
+shared account setup, set 'email' to the shared account, and set 'agent' to
+your email address in the configuration file.
 
 Prior to using zdgrab, a Zendesk API token must be generated for the account
 that will be used. This token helps avoid disclosing the Zendesk user account
@@ -46,40 +45,45 @@ a Python virtual environment.
 
 Options when running zdgrab can be configured through configuration files.  An
 example of the config file is given below. If you have API access directly
-using your account, then set `mail` to your Zendesk account login. If your
-organization uses a shared account for utilities, then set `mail` to the
+using your account, then set `email` to your Zendesk account login. If your
+organization uses a shared account for utilities, then set `email` to the
 utilities account and set `agent` to your Zendesk login.
 
-    # ~/.zd.cfg
-    [zd]
-    mail = util_account@example.com
+    # ~/.zdeskcfg
+    [zdesk]
+    email = util_account@example.com
     password = dneib393fwEF3ifbsEXAMPLEdhb93dw343
     url = https://example.zendesk.com
-    is_token = 1
+    token = 1
+
+    [zdesk]
     agent = you@example.com
 
 ### Usage
 
 The script can be invoked with the following synopsis:
 
-    usage: zdgrab [-h] [-v] [-t TICKETS] [-c CONFIG_FILE] [-w WORK_DIR] [-a AGENT]
-                  [-u URL] [-m MAIL] [-p [PASSWORD]] [-i]
+    usage: zdgrab [-h] [-v] [-t TICKETS] [-w WORK_DIR] [-a AGENT]
+                  [--zdesk-email EMAIL] [--zdesk-password PW] [--zdesk-url URL]
+                  [--zdesk-token]
 
     Download attachments from Zendesk tickets.
 
     optional arguments:
-      -h, --help      show this help message and exit
-      -v, --verbose   Verbose output
-      -t TICKETS      Ticket(s) to grab attachments (default: all of your open
-                      tickets)
-      -c CONFIG_FILE  Configuration file (overrides ~/.zd.cfg)
-      -w WORK_DIR     Working directory in which to store attachments. (default:
-                      ~/zdgrab/)
-      -a AGENT        Agent whose open tickets to search (default: me)
-      -u URL          URL of Zendesk (e.g. https://example.zendesk.com)
-      -m MAIL         E-Mail address for Zendesk login
-      -p [PASSWORD]   Password for Zendesk login
-      -i, --is-token  Is token? Specify if password supplied a Zendesk token
+      -h, --help            show this help message and exit
+      -v, --verbose         verbose output
+      -t TICKETS, --tickets TICKETS
+                            Ticket(s) to grab attachments (default: all of your
+                            open tickets)
+      -w WORK_DIR, --work-dir WORK_DIR
+                            Working directory in which to store attachments.
+                            (default: ~/zdgrab/)
+      -a AGENT, --agent AGENT
+                            Agent whose open tickets to search (default: me)
+      --zdesk-email EMAIL   zendesk login email
+      --zdesk-password PW   zendesk password or token
+      --zdesk-url URL       zendesk instance URL
+      --zdesk-token         specify if password is a zendesk token
 
 Here are some basic zdgrab usage examples to get started:
 
@@ -107,19 +111,17 @@ Here are some basic zdgrab usage examples to get started:
 
 * zdgrab uses Zendesk API version 2 with JSON
 * zdgrab depends on the following Python modules:
- * configparser
- * zendesk (patched for APIv2), which depends on:
+ * zdesk
    * httplib2
-   * simplejson (recommended)
-
-### TODO
-
-I would like to make the code into a class to further promote reuse. Also, I'd
-like to factor the configuration out to its own module and generalize it.
+   * simplejson
+ * zdeskcfg
+   * plac\_ini
+   * plac
 
 ### Resources
 
-* Python Zendesk module: https://github.com/eventbrite/zendesk
+* Python zdesk module: https://github.com/fprimex/zdesk
+* Python zdeskcfg module: https://github.com/fprimex/zdeskcfg
 * Zendesk Developer Site (For API information): http://developer.zendesk.com
 
 ### Using zdgrab as a module
@@ -131,17 +133,25 @@ operate on the attachments and directories that were grabbed. For example:
 ```
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import os
-from zdgrab import config, zdgrab
+import zdeskcfg
+from zdgrab import zdgrab
 
 if __name__ == '__main__':
-    zd, state = config()
-    grabs = zdgrab(zd, state['agent'], state['tickets'], state['work_dir'],
-                   state['verbose'])
+    # Using zdeskcfg will cause this script to have all of the ini
+    # and command line parsing capabilities of zdgrab.
+
+    # Passing eager=False is required in this case, otherwise plac and plac_ini
+    # will wrap the function value with list() and destroy the grabs dict.
+
+    grabs = zdeskcfg.call(zdgrab, section='zdgrab', eager=False)
 
     start_dir = os.path.abspath(os.getcwd())
 
-    for ticket_dir, attach_path in grabs.iteritems():
+    for ticket_dir in grabs.keys():
+        attach_path = grabs[ticket_dir]
         # Path to the ticket dir containing the attachment
         # os.chdir(ticket_dir)
 
@@ -154,8 +164,7 @@ if __name__ == '__main__':
         # Handy way to get a list of the comment dirs in numerical order:
         comment_dirs = [dir for dir in os.listdir(ticket_com_dir) if dir.isdigit()]
         comment_dirs = map(int, comment_dirs) # convert to ints
-        comment_dirs.sort()                   # sort them
-        comment_dirs = map(str, comment_dirs) # convert back to strings
+        comment_dirs = map(str, sorted(comment_dirs)) # sort and convert back to strings
 
         # Iterate through the dirs and over every file
         os.chdir(ticket_com_dir)
