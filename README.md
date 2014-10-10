@@ -109,14 +109,16 @@ Here are some basic zdgrab usage examples to get started:
 
 ## Notes
 
-* zdgrab uses Zendesk API version 2 with JSON
-* zdgrab depends on the following Python modules:
- * zdesk
-   * httplib2
-   * simplejson
- * zdeskcfg
-   * plac\_ini
-   * plac
+zdgrab uses Zendesk API version 2 with JSON
+
+zdgrab depends on the following Python modules:
+
+* zdesk
+  - httplib2
+  - simplejson
+* zdeskcfg
+  - plac\_ini
+  - plac
 
 ### Resources
 
