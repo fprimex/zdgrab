@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name="zdgrab",
-      version="2.0.0",
+      version="2.0.1",
       scripts=["bin/zdgrab", "bin/zdsplode"],
       packages=["zdgrab"],
       description="Get attachments from Zendesk tickets.",
