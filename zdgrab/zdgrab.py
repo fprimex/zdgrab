@@ -94,34 +94,27 @@ def zdgrab(verbose=False,
     # Change to working directory to begin file output
     os.chdir(work_dir)
 
+    if verbose:
+        print('Retrieving tickets')
+
     if tickets:
         # tickets given, query for those
-        q = ' '.join(['ticket_id:' + s for s in map(str,tickets)])
+        response = zd.tickets_show_many(ids=','.join([s for s in map(str,tickets)]),
+                get_all_pages=True)
+        result_field = 'tickets'
     else:
         # List of tickets not given. Get all of the attachments for all of this
         # user's open tickets.
         q = 'status<solved assignee:{}'.format(agent)
-
-    if verbose:
-        print('Retrieving tickets page 1')
-
-    response = zd.search(query=q)
+        response = zd.search(query=q, get_all_pages=True)
+        result_field = 'results'
 
     if response['count'] == 0:
         # No tickets from which to get attachments
         print("No tickets provided for attachment retrieval.")
         return {}
 
-    results = response['results']
-    page = 1
-    while response['next_page'] != None:
-        page += 1
-
-        if verbose:
-            print('Retrieving tickets page {}'.format(page))
-
-        response = zd.search(query=q, page=page)
-        results.extend(response['results'])
+    results = response[result_field]
 
     # Fix up some headers to use for downloading the attachments.
     # We're going to borrow the zdesk object's httplib client.
@@ -133,7 +126,7 @@ def zdgrab(verbose=False,
 
     # Get the attachments from the given zendesk tickets
     for ticket in results:
-        if ticket['result_type'] != 'ticket':
+        if result_field == 'results' and ticket['result_type'] != 'ticket':
             # This is not actually a ticket. Weird. Skip it.
             continue
 
@@ -145,19 +138,11 @@ def zdgrab(verbose=False,
         comment_num = 0
 
         if verbose:
-            print('Retrieving audits page {}'.format(page))
+            print('Retrieving audits')
 
-        response = zd.ticket_audits(ticket_id=ticket['id'])
+        response = zd.ticket_audits(ticket_id=ticket['id'],
+                get_all_pages=True)
         audits = response['audits']
-        page = 1
-        while response['next_page'] != None:
-            page += 1
-
-            if verbose:
-                print('Retrieving audits page {}'.format(page))
-
-            response = zd.ticket_audits(ticket_id=ticket['id'], page=page)
-            audits.extend(response['audits'])
 
         for audit in audits:
             for event in audit['events']:
