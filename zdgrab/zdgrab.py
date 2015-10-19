@@ -172,13 +172,16 @@ def zdgrab(verbose=False,
                         os.makedirs(comment_dir)
 
                     os.chdir(comment_dir)
-                    response, content = zd.client.request(attachment['content_url'], headers=headers)
-                    if response['status'] != '200':
+                    response = zd.client.request('GET',
+                                                 attachment['content_url'],
+                                                 headers=headers)
+                    
+                    if response.status_code != 200:
                         print('Error downloading {}'.format(attachment['content_url']))
                         continue
 
                     with open(name, 'wb') as f:
-                        f.write(content)
+                        f.write(response.content)
 
                     # Check for and create the grabs entry to return
                     if ticket_dir not in grabs:
