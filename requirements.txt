@@ -1,2 +1,2 @@
-'zdesk>=2.2.0'
+'zdesk>=2.3.0'
 zdeskcfg
