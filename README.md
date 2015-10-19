@@ -114,8 +114,7 @@ zdgrab uses Zendesk API version 2 with JSON
 zdgrab depends on the following Python modules:
 
 * zdesk
-  - httplib2
-  - simplejson
+  - requests
 * zdeskcfg
   - plac\_ini
   - plac
