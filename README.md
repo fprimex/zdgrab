@@ -56,7 +56,7 @@ utilities account and set `agent` to your Zendesk login.
     url = https://example.zendesk.com
     token = 1
 
-    [zdesk]
+    [zdgrab]
     agent = you@example.com
 
 ### Usage
@@ -84,6 +84,10 @@ The script can be invoked with the following synopsis:
       --zdesk-password PW   zendesk password or token
       --zdesk-url URL       zendesk instance URL
       --zdesk-token         specify if password is a zendesk token
+
+Note that command line arguments such as `AGENT` and `WORK_DIR` can also be
+specified (in lowercase form) within the appropriate section of
+`.zdeskcfg` as well.
 
 Here are some basic zdgrab usage examples to get started:
 
