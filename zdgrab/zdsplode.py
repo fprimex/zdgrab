@@ -1,8 +1,13 @@
 from __future__ import print_function
 
 import os
-import gzip, tarfile, datetime, re, shutil
+import gzip
+import tarfile
+import datetime
+import re
+import shutil
 from zipfile import ZipFile, BadZipfile
+
 
 def zdsplode(name, verbose=False):
     start_dir = os.path.abspath(os.getcwd())
@@ -10,7 +15,8 @@ def zdsplode(name, verbose=False):
     # Match on the filename
     # [base].[ext]
     # where ext is one of zip, tar, gz, tgz, tar.gz, or tar.bz2
-    m = re.match(r'^(?P<base>.*?)[.](?P<ext>zip|tar|tgz|tar\.gz|tar\.bz2|tar\.bz|gz)$', name)
+    m = re.match(
+        r'^(?P<base>.*?)[.](?P<ext>zip|tar|tgz|tar\.gz|tar\.bz2|tar\.bz|gz)$', name)
     if not m:
         # Not a compressed file that we're going to try to extract
         return
@@ -92,6 +98,6 @@ def zdsplode(name, verbose=False):
 
     # Extract anything compressed that this archive had in it.
     os.chdir(extract_dir)
-    for sub_file in sub_files: zdsplode(sub_file)
+    for sub_file in sub_files:
+        zdsplode(sub_file)
     os.chdir(start_dir)
-

@@ -14,15 +14,16 @@ from zdesk import Zendesk
 
 from .zdsplode import zdsplode
 
+
 @zdeskcfg.configure(
     verbose=('verbose output', 'flag', 'v'),
     tickets=('Ticket(s) to grab attachments (default: all of your open tickets)',
-                      'option', 't', None, None, 'TICKETS'),
+             'option', 't', None, None, 'TICKETS'),
     work_dir=('Working directory in which to store attachments. (default: ~/zdgrab/)',
-                      'option', 'w', None, None, 'WORK_DIR'),
+              'option', 'w', None, None, 'WORK_DIR'),
     agent=('Agent whose open tickets to search (default: me)',
-                      'option', 'a', None, None, 'AGENT'),
-    )
+           'option', 'a', None, None, 'AGENT'),
+)
 def zdgrab(verbose=False,
            tickets=None,
            work_dir=os.path.join(os.path.expanduser('~'), 'zdgrab'),
@@ -37,9 +38,9 @@ def zdgrab(verbose=False,
                   '  url: {}\n'
                   '  email: {}\n'
                   '  token: {}\n'
-                  '  password: (hidden)\n'.format( cfg['zdesk_url'],
-                                                   cfg['zdesk_email'],
-                                                   repr(cfg['zdesk_token']) ))
+                  '  password: (hidden)\n'.format(cfg['zdesk_url'],
+                                                  cfg['zdesk_email'],
+                                                  repr(cfg['zdesk_token'])))
         zd = Zendesk(**cfg)
     else:
         msg = textwrap.dedent("""\
@@ -99,8 +100,8 @@ def zdgrab(verbose=False,
 
     if tickets:
         # tickets given, query for those
-        response = zd.tickets_show_many(ids=','.join([s for s in map(str,tickets)]),
-                get_all_pages=True)
+        response = zd.tickets_show_many(ids=','.join([s for s in map(str, tickets)]),
+                                        get_all_pages=True)
         result_field = 'tickets'
     else:
         # List of tickets not given. Get all of the attachments for all of this
@@ -141,7 +142,7 @@ def zdgrab(verbose=False,
             print('Retrieving audits')
 
         response = zd.ticket_audits(ticket_id=ticket['id'],
-                get_all_pages=True)
+                                    get_all_pages=True)
         audits = response['audits']
 
         for audit in audits:
@@ -175,9 +176,10 @@ def zdgrab(verbose=False,
                     response = zd.client.request('GET',
                                                  attachment['content_url'],
                                                  headers=headers)
-                    
+
                     if response.status_code != 200:
-                        print('Error downloading {}'.format(attachment['content_url']))
+                        print('Error downloading {}'.format(
+                            attachment['content_url']))
                         continue
 
                     with open(name, 'wb') as f:
@@ -188,7 +190,7 @@ def zdgrab(verbose=False,
                         grabs[ticket_dir] = []
 
                     grabs[ticket_dir].append(
-                        os.path.join('comments', str(comment_num), name) )
+                        os.path.join('comments', str(comment_num), name))
 
                     # Let's try to extract this if it's compressed
                     zdsplode(name, verbose=verbose)
@@ -200,4 +202,3 @@ def zdgrab(verbose=False,
 def main(argv=None):
     zdeskcfg.call(zdgrab, section='zdgrab')
     return 0
-
