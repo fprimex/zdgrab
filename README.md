@@ -1,11 +1,13 @@
 # Download attachments from Zendesk tickets
 
 Zdgrab is a utility for downloading attachments to tickets from
-[Zendesk](http://www.zendesk.com) and extracting and arranging them.
+[Zendesk](http://www.zendesk.com) and extracting and arranging them. There is
+integration with [SendSafelyGrab](https://github.com/fprimex/SendSafelyGrab)
+for downloading SendSafely package links included in comments.
 
 ## Installing
 
-Tested with Python 2.7 and 3.4. Zdgrab requires
+Tested with Python 2.7 and 3.7. Zdgrab requires
 [zdeskcfg](http://github.com/fprimex/zdeskcfg) and
 [zdesk](http://github.com/fprimex/zdesk) Python modules, which have their own
 requirements.
@@ -14,47 +16,19 @@ requirements.
 pip install zdgrab
 ```
 
-You may wish to use easy\_install instead of pip, and use a virtualenv.
+## Zendesk Authentication
 
-## Zendesk API Token Setup
-
-Note: Users can use a Zendesk shared account and its access token. In this
-shared account setup, set 'email' to the shared account, and set 'agent' to
-your email address in the configuration file.
-
-Prior to using zdgrab, a Zendesk API token must be generated for the account
-that will be used. This token helps avoid disclosing the Zendesk user account
-password, and it can be regenerated or disabled altogether at any time.
-
-To create a Zendesk API token for use with zdgrab, follow these steps:
-
-1. Log into your Zendesk website: https://example.zendesk.com
-2. Navigate to the API settings: https://example.zendesk.com/settings/api/
-3. Click the **Enabled** checkbox inside the **Token Access** section.
-4. Make note of the 40 character string after *Your API token is:*
-5. Click Save.
-
-**NOTE**: If problems occur with step #3 above, the account used to access
-Zendesk could lack the necessary permissions to work with an API token. In this
-case, appropriate permissions should be requested from your administrator.
-
-Once the Zendesk API token is configured, and noted, proceed to configuring
-a Python virtual environment.
-
-### Configuration
-
-Options when running zdgrab can be configured through configuration files.  An
-example of the config file is given below. If you have API access directly
-using your account, then set `email` to your Zendesk account login. If your
-organization uses a shared account for utilities, then set `email` to the
-utilities account and set `agent` to your Zendesk login.
+Use one of the [authentication
+mechanisms](https://github.com/fprimex/zdesk#authentication) supported by
+`zdesk`. Configure `zdgrab` in `~/.zdeskcfg` similar to the following:
 
     # ~/.zdeskcfg
     [zdesk]
-    email = util_account@example.com
-    password = dneib393fwEF3ifbsEXAMPLEdhb93dw343
     url = https://example.zendesk.com
-    token = 1
+    email = util_account@example.com
+    oauth = dneib393fwEF3ifbsEXAMPLEdhb93dw343
+    # or
+    # api = nde3ibb93fEwwwFXEAPMLEdb93d3www43
 
     [zdgrab]
     agent = you@example.com
@@ -64,8 +38,10 @@ utilities account and set `agent` to your Zendesk login.
 The script can be invoked with the following synopsis:
 
     usage: zdgrab [-h] [-v] [-t TICKETS] [-w WORK_DIR] [-a AGENT]
-                  [--zdesk-email EMAIL] [--zdesk-password PW] [--zdesk-url URL]
-                  [--zdesk-token]
+                  [--ss-host SS_HOST] [--ss-id SS_ID] [--ss-secret SS_SECRET]
+                  [--ss-command SS_CMD] [--zdesk-email EMAIL]
+                  [--zdesk-oauth OAUTH] [--zdesk-api API] [--zdesk-password PW]
+                  [--zdesk-url URL] [--zdesk-token]
 
     Download attachments from Zendesk tickets.
 
@@ -80,16 +56,44 @@ The script can be invoked with the following synopsis:
                             (default: ~/zdgrab/)
       -a AGENT, --agent AGENT
                             Agent whose open tickets to search (default: me)
+      --ss-host SS_HOST     SendSafely host to connect to, including protocol
+      --ss-id SS_ID         SendSafely API key
+      --ss-secret SS_SECRET
+                            SendSafely API secret
+      --ss-command SS_CMD   SendSafely command
       --zdesk-email EMAIL   zendesk login email
+      --zdesk-oauth OAUTH   zendesk OAuth token
+      --zdesk-api API       zendesk API token
       --zdesk-password PW   zendesk password or token
       --zdesk-url URL       zendesk instance URL
-      --zdesk-token         specify if password is a zendesk token
+      --zdesk-token         specify if password is a zendesk token (deprecated)
 
-Note that command line arguments such as `AGENT` and `WORK_DIR` can also be
-specified (in lowercase form) within the appropriate section of
-`.zdeskcfg` as well.
+Note that command line arguments such as `-agent` and `-work_dir` can also be
+specified (in lowercase form) within the appropriate section of `.zdeskcfg` as
+well as, e.g., `agent` and `work_dir`.
 
 Here are some basic zdgrab usage examples to get started:
+
+### SendSafely support
+
+Zdgrab supports downloading [SendSafely](https://www.sendsafely.com/) packages
+with [SendSafelyGrab](https://github.com/fprimex/SendSafelyGrab). To set this
+up, obtain API credentials from SendSafely for the account to be used. Set the
+credentials and other configuration items in `~/.zdeskcfg` or provide them as
+command line parameters: `ss_host`, `ss_id`, `ss_secret`, `ss_command`.
+
+The `SendSafelyGrab.exe` command is a C# .NET program. It supports running on
+Windows with .NET and also on other platforms using `mono`. Download the
+`SendSafelyGrab` release and extract it somewhere onto the filesystem. Set
+`ss_command` to the full path to `SendSafelyGrab.exe`. If using `mono`, set the
+command to, e.g., `mono /path/to/SendSafelyGrab.exe`. If using `~/.zdeskcfg`,
+the path should, unfortunately, not contain spaces.
+
+With `ss_command` set, `zdgrab` will search all ticket comments for SendSafely
+links to packages (for example, those added by the SendSafely Zendesk app).
+When it finds a link, it will run `SendSafelyGrab.exe` with the arguments
+necessary to retrieve the packaged files. As with attachments, the files will
+be extracted automatically.
 
 #### Help
 
@@ -117,11 +121,11 @@ zdgrab uses Zendesk API version 2 with JSON
 
 zdgrab depends on the following Python modules:
 
-* zdesk
-  - requests
-* zdeskcfg
-  - plac\_ini
-  - plac
+* `zdesk`
+  - `requests`
+* `zdeskcfg`
+  - `plac_ini`
+  - `plac`
 
 ### Resources
 
