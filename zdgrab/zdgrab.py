@@ -64,12 +64,16 @@ def zdgrab(verbose=False,
 
     cfg = zdgrab.getconfig()
 
-    if cfg['zdesk_url'] and cfg['zdesk_email'] and cfg['zdesk_password']:
+    if cfg['zdesk_url'] and (
+            cfg['zdesk_oauth'] or
+            (cfg['zdesk_email'] and cfg['zdesk_password']) or
+            (cfg['zdesk_email'] and cfg['zdesk_api'])
+            ):
         vp.print('Configuring Zendesk with:\n'
                 '  url: {}\n'
                 '  email: {}\n'
                 '  token: {}\n'
-                '  password: (hidden)\n'.format(cfg['zdesk_url'],
+                '  password/oauth/api: (hidden)\n'.format(cfg['zdesk_url'],
                                                 cfg['zdesk_email'],
                                                 repr(cfg['zdesk_token'])))
 
@@ -82,8 +86,9 @@ def zdgrab(verbose=False,
             [zdesk]
             url = https://example.zendesk.com
             email = you@example.com
-            password = dneib393fwEF3ifbsEXAMPLEdhb93dw343
-            token = 1
+            api = dneib393fwEF3ifbsEXAMPLEdhb93dw343
+            # or
+            # oauth = ndei393bEwF3ifbEsssX
 
             [zdgrab]
             agent = agent@example.com
