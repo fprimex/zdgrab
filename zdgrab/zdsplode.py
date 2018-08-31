@@ -22,7 +22,7 @@ def zdsplode(name, verbose=False):
         return
 
     if verbose:
-        print('Extracting {}'.format(name))
+        print(' Extracting {}'.format(name))
 
     base, ext = m.groups()
 
@@ -34,7 +34,7 @@ def zdsplode(name, verbose=False):
         else:
             cfile = tarfile.open(name, 'r:*')
     except (IOError, tarfile.ReadError, BadZipfile):
-        print('Error reading file for extraction {}'.format(name))
+        print(' Error reading file for extraction {}'.format(name))
         return
 
     try:
@@ -52,7 +52,7 @@ def zdsplode(name, verbose=False):
         else:
             cfile.extractall(extract_dir)
     except OSError:
-        print('Error extracting {}'.format(name))
+        print(' Error extracting {}'.format(name))
         return
     finally:
         cfile.close()
@@ -85,8 +85,8 @@ def zdsplode(name, verbose=False):
             # Set the name of the extracted dir for recursive decompression
             extract_dir = base
     except shutil.Error as e:
-        print('Error arranging directories:')
-        print(e)
+        print(' Error arranging directories:')
+        print(' ' + e)
         return
 
     # See if there's anything left to do
