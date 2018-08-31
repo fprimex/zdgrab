@@ -1,8 +1,13 @@
 from __future__ import print_function
 
 import os
-import gzip, tarfile, datetime, re, shutil
+import gzip
+import tarfile
+import datetime
+import re
+import shutil
 from zipfile import ZipFile, BadZipfile
+
 
 def zdsplode(name, verbose=False):
     start_dir = os.path.abspath(os.getcwd())
@@ -10,13 +15,14 @@ def zdsplode(name, verbose=False):
     # Match on the filename
     # [base].[ext]
     # where ext is one of zip, tar, gz, tgz, tar.gz, or tar.bz2
-    m = re.match(r'^(?P<base>.*?)[.](?P<ext>zip|tar|tgz|tar\.gz|tar\.bz2|tar\.bz|gz)$', name)
+    m = re.match(
+        r'^(?P<base>.*?)[.](?P<ext>zip|tar|tgz|tar\.gz|tar\.bz2|tar\.bz|gz)$', name)
     if not m:
         # Not a compressed file that we're going to try to extract
         return
 
     if verbose:
-        print('Extracting {}'.format(name))
+        print(' Extracting {}'.format(name))
 
     base, ext = m.groups()
 
@@ -28,7 +34,7 @@ def zdsplode(name, verbose=False):
         else:
             cfile = tarfile.open(name, 'r:*')
     except (IOError, tarfile.ReadError, BadZipfile):
-        print('Error reading file for extraction {}'.format(name))
+        print(' Error reading file for extraction {}'.format(name))
         return
 
     try:
@@ -46,7 +52,7 @@ def zdsplode(name, verbose=False):
         else:
             cfile.extractall(extract_dir)
     except OSError:
-        print('Error extracting {}'.format(name))
+        print(' Error extracting {}'.format(name))
         return
     finally:
         cfile.close()
@@ -79,8 +85,8 @@ def zdsplode(name, verbose=False):
             # Set the name of the extracted dir for recursive decompression
             extract_dir = base
     except shutil.Error as e:
-        print('Error arranging directories:')
-        print(e)
+        print(' Error arranging directories:')
+        print(' ' + e)
         return
 
     # See if there's anything left to do
@@ -92,6 +98,6 @@ def zdsplode(name, verbose=False):
 
     # Extract anything compressed that this archive had in it.
     os.chdir(extract_dir)
-    for sub_file in sub_files: zdsplode(sub_file)
+    for sub_file in sub_files:
+        zdsplode(sub_file)
     os.chdir(start_dir)
-
