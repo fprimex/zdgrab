@@ -5,6 +5,17 @@ Zdgrab is a utility for downloading attachments to tickets from
 integration with [SendSafelyGrab](https://github.com/fprimex/SendSafelyGrab)
 for downloading SendSafely package links included in comments.
 
+## Note
+
+Zdgrab was originally written while I was at Basho, and my repository used to
+be a fork of their original one. On June 29, 2021 I deleted the forked repo and
+re-pushed it as its own standalone repository. This is the repo that is the
+source of the Pypi package.
+
+This version is diverging from that old, effectively unmaintained version
+pretty significantly, and I don't have any control over that repo anymore.
+Report issues here to have them fixed in the Pypi releases.
+
 ## Installing
 
 Tested with Python 2.7 and 3.7. Zdgrab requires
