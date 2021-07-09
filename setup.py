@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(name="zdgrab",
       version="3.0.0",
-      scripts=["bin/zdgrab", "bin/zdsplode"],
+      scripts=["bin/zdgrab"],
       packages=["zdgrab"],
       description="Get attachments from Zendesk tickets.",
       long_description="Get attachments from Zendesk tickets.",
