@@ -2,8 +2,6 @@
 zdgrab: Download attachments from Zendesk tickets
 """
 
-from __future__ import print_function
-
 import os
 import sys
 import re
@@ -14,7 +12,13 @@ import subprocess
 import zdeskcfg
 from zdesk import Zendesk
 
-from .zdsplode import zdsplode
+from asplode import asplode
+
+try:
+    from ssgrab import ssgrab
+    ss_present = True
+except ModuleNotFoundError:
+    ss_present = False
 
 class verbose_printer:
     def __init__(self, v):
@@ -54,7 +58,7 @@ def zdgrab(verbose=False,
            ss_command=None):
     "Download attachments from Zendesk tickets."
 
-    # SendsafelyGrab will only be invoked if the comment body contains a link.
+    # ssgrab will only be invoked if the comment body contains a link.
     # See the corresponding REGEX used by them, which has been ported to Python:
     # https://github.com/SendSafely/Windows-Client-API/blob/master/SendsafelyAPI/Utilities/ParseLinksUtility.cs
     ss_link_re = r'https://[-a-zA-Z\.]+/receive/\?[-A-Za-z0-9&=]+packageCode=[-A-Za-z0-9_]+#keyCode=[-A-Za-z0-9_]+'
@@ -69,13 +73,11 @@ def zdgrab(verbose=False,
             (cfg['zdesk_email'] and cfg['zdesk_password']) or
             (cfg['zdesk_email'] and cfg['zdesk_api'])
             ):
-        vp.print('Configuring Zendesk with:\n'
-                '  url: {}\n'
-                '  email: {}\n'
-                '  token: {}\n'
-                '  password/oauth/api: (hidden)\n'.format(cfg['zdesk_url'],
-                                                cfg['zdesk_email'],
-                                                repr(cfg['zdesk_token'])))
+        vp.print(f'Configuring Zendesk with:\n'
+                 f'  url: {cfg["zdesk_url"]}\n'
+                 f'  email: {cfg["zdesk_email"]}\n'
+                 f'  token: {repr(cfg["zdesk_token"])}\n'
+                 f'  password/oauth/api: (hidden)\n')
 
         zd = Zendesk(**cfg)
     else:
@@ -97,11 +99,11 @@ def zdgrab(verbose=False,
         return 1
 
     # Log the cfg
-    vp.print('Running with zdgrab config:\n'
-            ' verbose: {}\n'
-            ' tickets: {}\n'
-            ' work_dir: {}\n'
-            ' agent: {}\n'.format(verbose, tickets, work_dir, agent))
+    vp.print(f'Running with zdgrab config:\n'
+             f' verbose: {verbose}\n'
+             f' tickets: {tickets}\n'
+             f' work_dir: {work_dir}\n'
+             f' agent: {agent}\n')
 
     # tickets=None means default to getting all of the attachments for this
     # user's open tickets. If tickets is given, try to split it into ints
@@ -110,7 +112,7 @@ def zdgrab(verbose=False,
         try:
             tickets = [int(i) for i in tickets.split(',')]
         except ValueError:
-            print('Error: Could not convert to integers: {}'.format(tickets))
+            print(f'Error: Could not convert to integers: {tickets}')
             return 1
 
     # dict of paths to attachments retrieved to return. format is:
@@ -141,7 +143,7 @@ def zdgrab(verbose=False,
     else:
         # List of tickets not given. Get all of the attachments for all of this
         # user's open tickets.
-        q = 'status<solved assignee:{}'.format(agent)
+        q = f'status<solved assignee:{agent}'
         response = zd.search(query=q, get_all_pages=True)
         result_field = 'results'
 
@@ -150,7 +152,7 @@ def zdgrab(verbose=False,
         print("No tickets provided for attachment retrieval.")
         return {}
     else:
-        vp.print("Located {} tickets".format(response['count']))
+        vp.print(f'Located {response["count"]} tickets')
 
     results = response[result_field]
 
@@ -158,9 +160,9 @@ def zdgrab(verbose=False,
     # We're going to borrow the zdesk object's httplib client.
     headers = {}
     if zd.zdesk_email is not None and zd.zdesk_password is not None:
-        headers["Authorization"] = "Basic {}".format(
-            base64.b64encode(zd.zdesk_email.encode('ascii') + b':' +
-                             zd.zdesk_password.encode('ascii')))
+        basic = base64.b64encode(zd.zdesk_email.encode('ascii') + 
+                                 b':' + zd.zdesk_password.encode('ascii'))
+        headers["Authorization"] = f"Basic {basic}"
 
     # Get the attachments from the given zendesk tickets
     for ticket in results:
@@ -168,7 +170,7 @@ def zdgrab(verbose=False,
             # This is not actually a ticket. Weird. Skip it.
             continue
 
-        vp.print('Ticket {}'.format(ticket['id']))
+        vp.print(f'Ticket {ticket["id"]}')
 
         ticket_dir = os.path.join(work_dir, str(ticket['id']))
         ticket_com_dir = os.path.join(ticket_dir, 'comments')
@@ -190,11 +192,11 @@ def zdgrab(verbose=False,
                 for attachment in event['attachments']:
                     name = attachment['file_name']
                     if os.path.isfile(os.path.join(comment_dir, name)):
-                        vp.print(' Attachment {} already present'.format(name))
+                        vp.print(f' Attachment {name} already present')
                         continue
 
                     # Get this attachment
-                    vp.print(' Downloading attachment {}'.format(name))
+                    vp.print(f' Downloading attachment {name}')
 
                     # Check for and create the download directory
                     if not os.path.isdir(comment_dir):
@@ -206,8 +208,7 @@ def zdgrab(verbose=False,
                                                  headers=headers)
 
                     if response.status_code != 200:
-                        print('Error downloading {}'.format(
-                            attachment['content_url']))
+                        print(f'Error downloading {attachment["content_url"]}')
                         continue
 
                     with open(name, 'wb') as f:
@@ -221,36 +222,26 @@ def zdgrab(verbose=False,
                         os.path.join('comments', str(comment_num), name))
 
                     # Let's try to extract this if it's compressed
-                    zdsplode(name, verbose=verbose)
+                    asplode(name, verbose=verbose)
 
-                if ss_command:
-                    if not ss_link_pat.search(event['body']):
-                        # Don't bother invoking SendSafelyGrab if the body has
-                        # no SendSafely links.
-                        continue
+                if not ss_present:
+                    continue
 
-                    try:
-                        ss_output = subprocess.check_output(ss_command.split() + ["-v",
-                            "-h", ss_host, "-k", ss_id, "-s", ss_secret,
-                            "-d", comment_dir, event['body']],
-                            stderr=sys.stderr)
+                for link in ss_link_pat.findall(event['body']):
+                    ss_files = ssgrab(verbose=verbose, key=ss_id, secret=ss_secret,
+                           host=ss_host, link=link, work_dir=comment_dir)
 
-                        if ss_output:
-                            # Check for and create the grabs entry to return
-                            if ss_output and (ticket_dir not in grabs):
-                                grabs[ticket_dir] = []
+                    # Check for and create the grabs entry to return
+                    if ss_files and (ticket_dir not in grabs):
+                        grabs[ticket_dir] = []
 
-                        for name in ss_output.splitlines():
-                            namestr = name.decode()
-                            grabs[ticket_dir].append(
-                                os.path.join('comments', str(comment_num), namestr))
+                    for name in ss_files:
+                        grabs[ticket_dir].append(
+                            os.path.join('comments', str(comment_num), name))
 
-                            # Let's try to extract this if it's compressed
-                            os.chdir(comment_dir)
-                            zdsplode(namestr, verbose=verbose)
-                    except subprocess.CalledProcessError:
-                        # SendSafelyGrab.exe will print its own errors
-                        pass
+                        # Let's try to extract this if it's compressed
+                        os.chdir(comment_dir)
+                        asplode(name, verbose=verbose)
 
     os.chdir(start_dir)
     return grabs
