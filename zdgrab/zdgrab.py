@@ -46,18 +46,30 @@ class verbose_printer:
     ss_id=('SendSafely API key', 'option', None, str, None, 'SS_ID'),
     ss_secret=('SendSafely API secret',
                'option', None, str, None, 'SS_SECRET'),
-    ss_command=('SendSafely command', 'option', None, str, None, 'SS_CMD')
 )
-def zdgrab(verbose=False,
+def _zdgrab(verbose=False,
            tickets=None,
            work_dir=os.path.join(os.path.expanduser('~'), 'zdgrab'),
            agent='me',
            ss_host=None,
            ss_id=None,
-           ss_secret=None,
-           ss_command=None):
+           ss_secret=None):
     "Download attachments from Zendesk tickets."
 
+    cfg = _zdgrab.getconfig()
+
+    zdgrab(verbose=verbose,
+           tickets=tickets,
+           work_dir=work_dir,
+           agent=agent,
+           ss_host=ss_host,
+           ss_id=ss_id,
+           ss_secret=ss_secret,
+           zdesk_cfg=cfg)
+
+
+def zdgrab(verbose, tickets, work_dir, agent, ss_host, ss_id, ss_secret,
+           zdesk_cfg):
     # ssgrab will only be invoked if the comment body contains a link.
     # See the corresponding REGEX used by them, which has been ported to Python:
     # https://github.com/SendSafely/Windows-Client-API/blob/master/SendsafelyAPI/Utilities/ParseLinksUtility.cs
@@ -66,20 +78,18 @@ def zdgrab(verbose=False,
 
     vp = verbose_printer(verbose)
 
-    cfg = zdgrab.getconfig()
-
-    if cfg['zdesk_url'] and (
-            cfg['zdesk_oauth'] or
-            (cfg['zdesk_email'] and cfg['zdesk_password']) or
-            (cfg['zdesk_email'] and cfg['zdesk_api'])
+    if zdesk_cfg.get('zdesk_url') and (
+            zdesk_cfg.get('zdesk_oauth') or
+            (zdesk_cfg.get('zdesk_email') and zdesk_cfg.get('zdesk_password')) or
+            (zdesk_cfg.get('zdesk_email') and zdesk_cfg.get('zdesk_api'))
             ):
         vp.print(f'Configuring Zendesk with:\n'
-                 f'  url: {cfg["zdesk_url"]}\n'
-                 f'  email: {cfg["zdesk_email"]}\n'
-                 f'  token: {repr(cfg["zdesk_token"])}\n'
+                 f'  url: {zdesk_cfg.get("zdesk_url")}\n'
+                 f'  email: {zdesk_cfg.get("zdesk_email")}\n'
+                 f'  token: {repr(zdesk_cfg.get("zdesk_token"))}\n'
                  f'  password/oauth/api: (hidden)\n')
 
-        zd = Zendesk(**cfg)
+        zd = Zendesk(**zdesk_cfg)
     else:
         msg = textwrap.dedent("""\
             Error: Need Zendesk config to continue.
@@ -248,5 +258,5 @@ def zdgrab(verbose=False,
 
 
 def main(argv=None):
-    zdeskcfg.call(zdgrab, section='zdgrab')
+    zdeskcfg.call(_zdgrab, section='zdgrab')
     return 0
