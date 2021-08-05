@@ -2,6 +2,7 @@
 zdgrab: Download attachments from Zendesk tickets
 """
 
+
 import os
 import sys
 import re
@@ -13,6 +14,7 @@ import zdeskcfg
 from zdesk import Zendesk
 
 from asplode import asplode
+
 
 try:
     from ssgrab import ssgrab
@@ -37,7 +39,9 @@ class verbose_printer:
     verbose=('verbose output', 'flag', 'v'),
     tickets=('Ticket(s) to grab attachments (default: all of your open tickets)',
              'option', 't', str, None, 'TICKETS'),
-    work_dir=('Working directory in which to store attachments. (default: ~/zdgrab/)',
+    count=('Retrieve up to this many attachments (default: 0, all)',
+             'option', 'c', int, None, 'COUNT'),
+    work_dir=('Working directory in which to store attachments. (default: ~/zdgrab)',
               'option', 'w', str, None, 'WORK_DIR'),
     agent=('Agent whose open tickets to search (default: me)',
            'option', 'a', str, None, 'AGENT'),
@@ -49,6 +53,7 @@ class verbose_printer:
 )
 def _zdgrab(verbose=False,
            tickets=None,
+           count=0,
            work_dir=os.path.join(os.path.expanduser('~'), 'zdgrab'),
            agent='me',
            ss_host=None,
@@ -60,6 +65,7 @@ def _zdgrab(verbose=False,
 
     zdgrab(verbose=verbose,
            tickets=tickets,
+           count=count,
            work_dir=work_dir,
            agent=agent,
            ss_host=ss_host,
@@ -68,7 +74,7 @@ def _zdgrab(verbose=False,
            zdesk_cfg=cfg)
 
 
-def zdgrab(verbose, tickets, work_dir, agent, ss_host, ss_id, ss_secret,
+def zdgrab(verbose, tickets, count, work_dir, agent, ss_host, ss_id, ss_secret,
            zdesk_cfg):
     # ssgrab will only be invoked if the comment body contains a link.
     # See the corresponding REGEX used by them, which has been ported to Python:
@@ -112,6 +118,7 @@ def zdgrab(verbose, tickets, work_dir, agent, ss_host, ss_id, ss_secret,
     vp.print(f'Running with zdgrab config:\n'
              f' verbose: {verbose}\n'
              f' tickets: {tickets}\n'
+             f' count: {count}\n'
              f' work_dir: {work_dir}\n'
              f' agent: {agent}\n')
 
@@ -185,28 +192,42 @@ def zdgrab(verbose, tickets, work_dir, agent, ss_host, ss_id, ss_secret,
         ticket_dir = os.path.join(work_dir, str(ticket['id']))
         ticket_com_dir = os.path.join(ticket_dir, 'comments')
         comment_num = 0
+        attach_num = 0
 
         response = zd.ticket_audits(ticket_id=ticket['id'],
                                     get_all_pages=True)
-        audits = response['audits']
+
+        audits = response['audits'][::-1]
+        audit_num = len(audits) + 1
 
         for audit in audits:
+            audit_num -= 1
             for event in audit['events']:
                 if event['type'] != 'Comment':
                     # This event isn't a comment. Skip it.
                     continue
 
-                comment_num += 1
+                comment_num = audit_num
                 comment_dir = os.path.join(ticket_com_dir, str(comment_num))
 
+                if count > 0 and attach_num >= count:
+                        break
+
                 for attachment in event['attachments']:
+                    attach_num += 1
+
+                    if count > 0:
+                        attach_msg = f' ({attach_num}/{count})'
+                    else:
+                        attach_msg = f' ({attach_num})'
+
                     name = attachment['file_name']
                     if os.path.isfile(os.path.join(comment_dir, name)):
-                        vp.print(f' Attachment {name} already present')
+                        vp.print(f' Attachment {name} already present{attach_msg}')
                         continue
 
                     # Get this attachment
-                    vp.print(f' Downloading attachment {name}')
+                    vp.print(f' Downloading attachment {name}{attach_msg}')
 
                     # Check for and create the download directory
                     if not os.path.isdir(comment_dir):
@@ -238,8 +259,16 @@ def zdgrab(verbose, tickets, work_dir, agent, ss_host, ss_id, ss_secret,
                     continue
 
                 for link in ss_link_pat.findall(event['body']):
+                    attach_num += 1
+
+                    if count > 0:
+                        attach_msg = f' ({attach_num}/{count})'
+                    else:
+                        attach_msg = f' ({attach_num})'
+
                     ss_files = ssgrab(verbose=verbose, key=ss_id, secret=ss_secret,
-                           host=ss_host, link=link, work_dir=comment_dir)
+                                      host=ss_host, link=link, work_dir=comment_dir,
+                                      postmsg=attach_msg)
 
                     # Check for and create the grabs entry to return
                     if ss_files and (ticket_dir not in grabs):
@@ -259,4 +288,3 @@ def zdgrab(verbose, tickets, work_dir, agent, ss_host, ss_id, ss_secret,
 
 def main(argv=None):
     zdeskcfg.call(_zdgrab, section='zdgrab')
-    return 0
