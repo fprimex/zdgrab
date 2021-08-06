@@ -22,7 +22,8 @@ setup(
                          "Topic :: Utilities",
                        ],
     install_requires = [
-                         "plac"
+                         "zdesk",
+                         "zdeskcfg"
                        ],
     entry_points     = {
                          'console_scripts': [
