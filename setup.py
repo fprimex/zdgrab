@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name             = "zdgrab",
-    version          = "4.0.0",
+    version          = "4.0.1",
     author           = "Brent Woodruff",
     author_email     = "brent@fprimex.com",
     url              = "http://github.com/fprimex/zdgrab",
@@ -23,7 +23,8 @@ setup(
                        ],
     install_requires = [
                          "zdesk",
-                         "zdeskcfg"
+                         "zdeskcfg",
+                         "asplode"
                        ],
     entry_points     = {
                          'console_scripts': [
