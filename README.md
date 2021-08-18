@@ -18,10 +18,11 @@ Report issues here to have them fixed in the Pypi releases.
 
 ## Installing
 
-Tested with Python 2.7 and 3.7. Zdgrab requires
-[zdeskcfg](http://github.com/fprimex/zdeskcfg) and
-[zdesk](http://github.com/fprimex/zdesk) Python modules, which have their own
-requirements.
+Tested with Python 3.9. Zdgrab requires Python 3.x,
+[zdeskcfg](http://github.com/fprimex/zdeskcfg),
+[zdesk](http://github.com/fprimex/zdesk),
+[asplode](http://github.com/fprimex/asplode), and Python modules, which have
+their own requirements.
 
 ```
 pip install zdgrab
@@ -50,9 +51,9 @@ The script can be invoked with the following synopsis:
 
     usage: zdgrab [-h] [-v] [-t TICKETS] [-w WORK_DIR] [-a AGENT]
                   [--ss-host SS_HOST] [--ss-id SS_ID] [--ss-secret SS_SECRET]
-                  [--ss-command SS_CMD] [--zdesk-email EMAIL]
-                  [--zdesk-oauth OAUTH] [--zdesk-api API] [--zdesk-password PW]
-                  [--zdesk-url URL] [--zdesk-token]
+                  [--zdesk-email EMAIL] [--zdesk-oauth OAUTH]
+                  [--zdesk-api API] [--zdesk-password PW] [--zdesk-url URL]
+                  [--zdesk-token]
 
     Download attachments from Zendesk tickets.
 
@@ -71,7 +72,6 @@ The script can be invoked with the following synopsis:
       --ss-id SS_ID         SendSafely API key
       --ss-secret SS_SECRET
                             SendSafely API secret
-      --ss-command SS_CMD   SendSafely command
       --zdesk-email EMAIL   zendesk login email
       --zdesk-oauth OAUTH   zendesk OAuth token
       --zdesk-api API       zendesk API token
@@ -88,21 +88,14 @@ Here are some basic zdgrab usage examples to get started:
 ### SendSafely support
 
 Zdgrab supports downloading [SendSafely](https://www.sendsafely.com/) packages
-with [SendSafelyGrab](https://github.com/fprimex/SendSafelyGrab). To set this
-up, obtain API credentials from SendSafely for the account to be used. Set the
-credentials and other configuration items in `~/.zdeskcfg` or provide them as
-command line parameters: `ss_host`, `ss_id`, `ss_secret`, `ss_command`.
+with [ssgrab](https://github.com/fprimex/ssgrab). To set this up, obtain API
+credentials from SendSafely for the account to be used. Set the credentials and
+other configuration items in `~/.zdeskcfg` or provide them as command line
+parameters: `ss_host`, `ss_id`, `ss_secret`.
 
-The `SendSafelyGrab.exe` command is a C# .NET program. It supports running on
-Windows with .NET and also on other platforms using `mono`. Download the
-`SendSafelyGrab` release and extract it somewhere onto the filesystem. Set
-`ss_command` to the full path to `SendSafelyGrab.exe`. If using `mono`, set the
-command to, e.g., `mono /path/to/SendSafelyGrab.exe`. If using `~/.zdeskcfg`,
-the path should, unfortunately, not contain spaces.
-
-With `ss_command` set, `zdgrab` will search all ticket comments for SendSafely
-links to packages (for example, those added by the SendSafely Zendesk app).
-When it finds a link, it will run `SendSafelyGrab.exe` with the arguments
+With `ssgrab` installed, `zdgrab` will search all ticket comments for
+SendSafely links to packages (for example, those added by the SendSafely
+Zendesk app).  When it finds a link, it will run `ssgrab` with the arguments
 necessary to retrieve the packaged files. As with attachments, the files will
 be extracted automatically.
 
@@ -113,8 +106,6 @@ be extracted automatically.
 #### Get/update all attachment for your open tickets
 
     zdgrab
-
-#### Get/update all attachments for your open tickets with verbose output
 
     zdgrab -v
 
@@ -196,9 +187,7 @@ if __name__ == '__main__':
     os.chdir(start_dir)
 ```
 
-### Zdsplode
+### Asplode
 
-Archives that are downloaded are automatically extracted using an included
-function called `zdsplode`. A command line script for calling zdsplode is also
-included.
+Archives that are downloaded are automatically extracted using `asplode`.
 
