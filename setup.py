@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name             = "zdgrab",
-    version          = "4.0.1",
+    version          = "4.1.0",
     author           = "Brent Woodruff",
     author_email     = "brent@fprimex.com",
     url              = "http://github.com/fprimex/zdgrab",
@@ -16,7 +16,7 @@ setup(
                          "zdgrab"
                        ],
     classifiers      = [
-                         "Development Status :: 4 - Beta",
+                         "Development Status :: 5 - Production/Stable",
                          "Intended Audience :: End Users/Desktop",
                          "License :: OSI Approved :: Apache Software License",
                          "Topic :: Utilities",

@@ -2,13 +2,15 @@
 zdgrab: Download attachments from Zendesk tickets
 """
 
-
 import os
 import sys
 import re
 import textwrap
 import base64
-import subprocess
+import json
+
+from datetime import datetime, timedelta
+from zdesk.zdesk import get_id_from_url
 
 import zdeskcfg
 from zdesk import Zendesk
@@ -21,6 +23,7 @@ try:
     ss_present = True
 except ModuleNotFoundError:
     ss_present = False
+
 
 class verbose_printer:
     def __init__(self, v):
@@ -35,36 +38,63 @@ class verbose_printer:
     def null_print(self, msg, end='\n'):
         pass
 
+
 @zdeskcfg.configure(
-    verbose=('verbose output', 'flag', 'v'),
-    tickets=('Ticket(s) to grab attachments (default: all of your open tickets)',
-             'option', 't', str, None, 'TICKETS'),
-    count=('Retrieve up to this many attachments (default: 0, all)',
-             'option', 'c', int, None, 'COUNT'),
-    work_dir=('Working directory in which to store attachments. (default: ~/zdgrab)',
-              'option', 'w', str, None, 'WORK_DIR'),
+    verbose=('verbose output',
+                 'flag', 'v'),
+    tickets=('Comma separated ticket numbers to grab (default: all of your open tickets)',
+                 'option', 't', str, None, 'TICKETS'),
+    orgs=('Grab from one or more Organizations (default: none)',
+                 'option', 'o', str, None, 'ORGS'),
+    items=('Comma separated items to grab: attachments,comments,audits (default: attachments)',
+                 'option', 'i', str, None, 'ITEMS'),
+    status=('Query expression for ticket status (default: <solved)',
+                 'option', 's', str, None, 'STATUS'),
+    query=('Additional query when searching tickets (default: "")',
+                 'option', 'q', str, None, 'QUERY'),
+    days=('Retrieve tickets opened since a number of days (default: 0, all)',
+                 'option', 'd', int, None, 'DATETIME'),
+    js=('Save response information in JSON format (default: false)',
+                 'flag', 'j'),
+    count=('Retrieve up to this many total specified items (default: 0, all)',
+                 'option', 'c', int, None, 'COUNT'),
+    work_dir=('Working directory to store items in (default: ~/zdgrab)',
+                 'option', 'w', str, None, 'WORK_DIR'),
     agent=('Agent whose open tickets to search (default: me)',
-           'option', 'a', str, None, 'AGENT'),
+                 'option', 'a', str, None, 'AGENT'),
     ss_host=('SendSafely host to connect to, including protocol',
-               'option', None, str, None, 'SS_HOST'),
-    ss_id=('SendSafely API key', 'option', None, str, None, 'SS_ID'),
+                 'option', None, str, None, 'SS_HOST'),
+    ss_id=('SendSafely API key',
+                 'option', None, str, None, 'SS_ID'),
     ss_secret=('SendSafely API secret',
-               'option', None, str, None, 'SS_SECRET'),
+                 'option', None, str, None, 'SS_SECRET'),
 )
 def _zdgrab(verbose=False,
-           tickets=None,
-           count=0,
-           work_dir=os.path.join(os.path.expanduser('~'), 'zdgrab'),
-           agent='me',
-           ss_host=None,
-           ss_id=None,
-           ss_secret=None):
+            tickets=None,
+            orgs=None,
+            items="attachments",
+            status="<solved",
+            query="",
+            days=0,
+            js=False,
+            count=0,
+            work_dir=os.path.join(os.path.expanduser('~'), 'zdgrab'),
+            agent='me',
+            ss_host=None,
+            ss_id=None,
+            ss_secret=None):
     "Download attachments from Zendesk tickets."
 
     cfg = _zdgrab.getconfig()
 
     zdgrab(verbose=verbose,
            tickets=tickets,
+           orgs=orgs,
+           items=items,
+           status=status,
+           query=query,
+           days=days,
+           js=js,
            count=count,
            work_dir=work_dir,
            agent=agent,
@@ -74,8 +104,8 @@ def _zdgrab(verbose=False,
            zdesk_cfg=cfg)
 
 
-def zdgrab(verbose, tickets, count, work_dir, agent, ss_host, ss_id, ss_secret,
-           zdesk_cfg):
+def zdgrab(verbose, tickets, orgs, status, query, items, days, js, count,
+           work_dir, agent, ss_host, ss_id, ss_secret, zdesk_cfg):
     # ssgrab will only be invoked if the comment body contains a link.
     # See the corresponding REGEX used by them, which has been ported to Python:
     # https://github.com/SendSafely/Windows-Client-API/blob/master/SendsafelyAPI/Utilities/ParseLinksUtility.cs
@@ -88,7 +118,7 @@ def zdgrab(verbose, tickets, count, work_dir, agent, ss_host, ss_id, ss_secret,
             zdesk_cfg.get('zdesk_oauth') or
             (zdesk_cfg.get('zdesk_email') and zdesk_cfg.get('zdesk_password')) or
             (zdesk_cfg.get('zdesk_email') and zdesk_cfg.get('zdesk_api'))
-            ):
+    ):
         vp.print(f'Configuring Zendesk with:\n'
                  f'  url: {zdesk_cfg.get("zdesk_url")}\n'
                  f'  email: {zdesk_cfg.get("zdesk_email")}\n'
@@ -116,11 +146,37 @@ def zdgrab(verbose, tickets, count, work_dir, agent, ss_host, ss_id, ss_secret,
 
     # Log the cfg
     vp.print(f'Running with zdgrab config:\n'
-             f' verbose: {verbose}\n'
-             f' tickets: {tickets}\n'
-             f' count: {count}\n'
+             f' verbose:  {verbose}\n'
+             f' tickets:  {tickets}\n'
+             f' orgs:     {orgs}\n'
+             f' items:    {items}\n'
+             f' status:   {status}\n'
+             f' query:    {query}\n'
+             f' days:     {days}\n'
+             f' js:       {js}\n'
+             f' count:    {count}\n'
              f' work_dir: {work_dir}\n'
-             f' agent: {agent}\n')
+             f' agent:    {agent}\n')
+
+    if not items:
+        print('Error: No items given to grab')
+        return 1
+
+    if days > 0:
+        start_time = datetime.utcnow() - timedelta(days=days)
+    else:
+        # UNIX epoch, 1969
+        start_time = datetime.fromtimestamp(0)
+
+    possible_items = {"attachments", "comments", "audits"}
+    items = set(items.split(','))
+
+    grab_items = possible_items.intersection(items)
+    invalid_items = items - possible_items
+
+    if len(invalid_items) > 0:
+        print(f'Error: Invalid item(s) specified: {invalid_items} ')
+        return 1
 
     # tickets=None means default to getting all of the attachments for this
     # user's open tickets. If tickets is given, try to split it into ints
@@ -136,6 +192,30 @@ def zdgrab(verbose, tickets, count, work_dir, agent, ss_host, ss_id, ss_secret,
     # { 'path/to/ticket/1': [ 'path/to/attachment1', 'path/to/attachment2' ],
     #   'path/to/ticket/2': [ 'path/to/attachment1', 'path/to/attachment2' ] }
     grabs = {}
+
+    # list to hold all of the ticket objects retrieved
+    results = []
+
+    # list to hold all of the ticket numbers being retrieved
+    ticket_nums = []
+
+    if orgs:
+        orgs = orgs.split(',')
+        for o in orgs:
+            resp = zd.search(query=f'type:organization "{o}"')
+
+            if resp["count"] == 0:
+                print(f'Error: Could not find org {o}')
+                continue
+            elif resp["count"] > 1:
+                print(f'Error: multiple results for org {o}')
+                for result in resp["results"]:
+                    print(f'  {result["name"]}')
+                continue
+
+            q = f'type:ticket organization:"{o}" status{status} created>{start_time.isoformat()[:10]} {query}'
+            resp = zd.search(query=q, get_all_pages=True)
+            results.extend(resp['results'])
 
     # Save the current directory so we can go back once done
     start_dir = os.getcwd()
@@ -153,40 +233,47 @@ def zdgrab(verbose, tickets, count, work_dir, agent, ss_host, ss_id, ss_secret,
     vp.print('Retrieving tickets')
 
     if tickets:
-        # tickets given, query for those
+        # tickets given, query for those. tickets that are explicitly requested
+        # are retrieved regardless as to other options such as since.
         response = zd.tickets_show_many(ids=','.join([s for s in map(str, tickets)]),
                                         get_all_pages=True)
-        result_field = 'tickets'
-    else:
-        # List of tickets not given. Get all of the attachments for all of this
-        # user's open tickets.
-        q = f'status<solved assignee:{agent}'
+
+        # tickets_show_many is not a search, so manually insert 'result_type'
+        for t in response['tickets']:
+            t['result_type'] = 'ticket'
+
+        results.extend(response['tickets'])
+
+    if not tickets and not orgs:
+        # No ticket or org given. Get all of the attachments for all of this
+        # user's tickets.
+        q = f'status{status} assignee:{agent} created>{start_time.isoformat()[:10]} {query}'
         response = zd.search(query=q, get_all_pages=True)
-        result_field = 'results'
+        results.extend(response['results'])
 
-    if response['count'] == 0:
-        # No tickets from which to get attachments
-        print("No tickets provided for attachment retrieval.")
-        return {}
-    else:
-        vp.print(f'Located {response["count"]} tickets')
+        if response['count'] == 0:
+            # No tickets from which to get attachments
+            print("No tickets found for retrieval.")
+            return {}
 
-    results = response[result_field]
+    vp.print(f'Located {len(results)} tickets')
 
     # Fix up some headers to use for downloading the attachments.
     # We're going to borrow the zdesk object's httplib client.
     headers = {}
     if zd.zdesk_email is not None and zd.zdesk_password is not None:
-        basic = base64.b64encode(zd.zdesk_email.encode('ascii') + 
+        basic = base64.b64encode(zd.zdesk_email.encode('ascii') +
                                  b':' + zd.zdesk_password.encode('ascii'))
         headers["Authorization"] = f"Basic {basic}"
 
-    # Get the attachments from the given zendesk tickets
-    for ticket in results:
-        if result_field == 'results' and ticket['result_type'] != 'ticket':
-            # This is not actually a ticket. Weird. Skip it.
-            continue
+    for i, ticket in enumerate(results):
+        if ticket['result_type'] != 'ticket':
+            del results[i]
 
+        ticket_nums.append(ticket['id'])
+
+    # Get the items from the given zendesk tickets
+    for i, ticket in enumerate(results):
         vp.print(f'Ticket {ticket["id"]}')
 
         ticket_dir = os.path.join(work_dir, str(ticket['id']))
@@ -194,24 +281,64 @@ def zdgrab(verbose, tickets, count, work_dir, agent, ss_host, ss_id, ss_secret,
         comment_num = 0
         attach_num = 0
 
+        if not os.path.isdir(ticket_dir):
+            os.makedirs(ticket_dir)
+
+        if js:
+            os.chdir(ticket_dir)
+            with open('ticket.json', 'w') as f:
+                json.dump(ticket, f, indent=2)
+
         response = zd.ticket_audits(ticket_id=ticket['id'],
                                     get_all_pages=True)
 
         audits = response['audits'][::-1]
         audit_num = len(audits) + 1
+        results[i]['audits'] = audits
 
         for audit in audits:
+            audit_time = audit.get('created_at')
             audit_num -= 1
             for event in audit['events']:
-                if event['type'] != 'Comment':
-                    # This event isn't a comment. Skip it.
-                    continue
-
                 comment_num = audit_num
                 comment_dir = os.path.join(ticket_com_dir, str(comment_num))
 
+                if js:
+                    if not os.path.isdir(comment_dir):
+                        os.makedirs(comment_dir)
+
+                    os.chdir(comment_dir)
+                    with open('comment.json', 'w') as f:
+                        json.dump(event, f, indent=2)
+
+                if event['type'] == 'Comment' and 'comments' in grab_items:
+                    comment_time = event.get('created_at', audit_time)
+                    if not comment_time:
+                        comment_time = 'unknown time'
+
+                    if os.path.isfile(os.path.join(comment_dir, 'comment.txt')):
+                        vp.print(f' Comment {comment_num} already present')
+                    else:
+                        # Check for and create the download directory
+                        if not os.path.isdir(comment_dir):
+                            os.makedirs(comment_dir)
+
+                        os.chdir(comment_dir)
+                        with open('comment.txt', 'w') as f:
+                            if event['public']:
+                                visibility = 'Public'
+                            else:
+                                visibility = 'Private'
+
+                            vp.print(f' Writing comment {comment_num}')
+                            f.write(f'{visibility} comment by {event["author_id"]} at {comment_time}')
+                            f.write(event['body'])
+
                 if count > 0 and attach_num >= count:
-                        break
+                    break
+
+                if 'attachments' not in grab_items or event['type'] != 'Comment':
+                    continue
 
                 for attachment in event['attachments']:
                     attach_num += 1
@@ -223,7 +350,8 @@ def zdgrab(verbose, tickets, count, work_dir, agent, ss_host, ss_id, ss_secret,
 
                     name = attachment['file_name']
                     if os.path.isfile(os.path.join(comment_dir, name)):
-                        vp.print(f' Attachment {name} already present{attach_msg}')
+                        vp.print(
+                            f' Attachment {name} already present{attach_msg}')
                         continue
 
                     # Get this attachment
@@ -281,6 +409,25 @@ def zdgrab(verbose, tickets, count, work_dir, agent, ss_host, ss_id, ss_secret,
                         # Let's try to extract this if it's compressed
                         os.chdir(comment_dir)
                         asplode(name, verbose=verbose)
+
+    if js:
+        os.chdir(work_dir)
+        with open('tickets.js', "a+") as f:
+            tickets_data = f.read()
+
+            if tickets_data:
+                ticketsjs = json.loads(tickets_data)
+
+                if ticketsjs:
+                    for i, ticket in enumerate(ticketsjs):
+                        if ticket['id'] in ticket_nums:
+                            del ticketsjs[i]
+
+                    results.extend(ticketsjs)
+
+            f.seek(0)
+            f.write(json.dumps(results, indent=2))
+            f.truncate()
 
     os.chdir(start_dir)
     return grabs
