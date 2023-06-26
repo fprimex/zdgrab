@@ -331,7 +331,7 @@ def zdgrab(verbose, tickets, orgs, status, query, items, days, js, count,
                                 visibility = 'Private'
 
                             vp.print(f' Writing comment {comment_num}')
-                            f.write(f'{visibility} comment by {event["author_id"]} at {comment_time}')
+                            f.write(f'{visibility} comment by {event["author_id"]} at {comment_time}\n')
                             f.write(event['body'])
 
                 if count > 0 and attach_num >= count:
